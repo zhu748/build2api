@@ -2,7 +2,7 @@
 
 # --- 项目配置 ---
 CONTAINER_NAME="build2api"
-IMAGE_NAME="ghcr.io/wuchen0309/build2api:latest"
+IMAGE_NAME="ghcr.io/zhu748/build2api:latest"
 HOST_PORT="7860"
 ENV_FILE="app.env" # 指定您的环境文件名
 
