@@ -2119,7 +2119,7 @@ class ProxyServerSystem extends EventEmitter {
     }
     
     this.config = config;
-    this.logger.info("================ [ 生效配置 ] ================");
+    this.logger.info("================[生效配置]================");
     this.logger.info(`  HTTP 服务端口: ${this.config.httpPort}`);
     this.logger.info(`  监听地址: ${this.config.host}`);
     this.logger.info(`  流式模式: ${this.config.streamingMode}`);
