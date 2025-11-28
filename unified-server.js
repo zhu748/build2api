@@ -1,5 +1,3 @@
---- START OF FILE unified-server.js ---
-
 const session = require("express-session");
 const cookieParser = require("cookie-parser");
 const crypto = require("crypto");
