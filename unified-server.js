@@ -520,11 +520,11 @@ class BrowserManager {
   }
 
   // ===================================================================================
-  // [新增] 后台执行 APP 唤醒逻辑 (V4 最终版: 只要看见就点，消失即停)
+  // 后台执行 APP 唤醒逻辑
   // ===================================================================================
   async _startBackgroundWakeup() {
-    // 1. 绝对缓冲：等待 5 秒
-    await new Promise(r => setTimeout(r, 5000));
+    // 1. 绝对缓冲：等待2秒
+    await new Promise(r => setTimeout(r, 2000));
     
     // 安全检查
     if (!this.page || this.page.isClosed()) return;
@@ -542,8 +542,9 @@ class BrowserManager {
             });
         } catch (e) {}
 
-        // 锁定目标：只要包含 "Launch" 的按钮 (不管它是 Launch! 还是 Launch)
-        const launchBtn = this.page.locator('button:has-text("Launch")').first();
+        // [修复] 锁定目标：使用正则精确匹配 "Launch" 或 "Launch!" (忽略大小写和空格)
+        // 这样可以避开右上角文本为 "rocket_launch" 的 Deploy 按钮
+        const launchBtn = this.page.locator('button', { hasText: /^\s*Launch!?\s*$/i }).first();
         
         // 如果起手就看不到，直接收工
         if (!await launchBtn.isVisible({ timeout: 3000 })) {
@@ -591,7 +592,7 @@ class BrowserManager {
 
         if (attempt >= maxAttempts) {
             // 如果到了 50 次还在，那可能是真的遇到硬茬了
-            this.logger.warn(`[Browser] ℹ️ 达到点击上限 (${maxAttempts}次)，按钮可能依然顽强存在或已经消失？请自行尝试可用性。`);
+            this.logger.warn(`[Browser] ❗ 达到点击上限 (${maxAttempts}次)，按钮可能依然顽强存在或已经消失，请自行尝试可用性。`);
         }
 
         // 截图留证
