@@ -515,97 +515,94 @@ class BrowserManager {
       `✅ [Browser] 账号切换完成，当前账号: ${this.currentAuthIndex}`
     );
     
-// [这里是第三步的代码：切换账号后调用唤醒]
+// 切换账号后调用唤醒
     this._startBackgroundWakeup();
   }
 
   // ===================================================================================
-  // [新增] 后台执行 APP 唤醒逻辑 (V4 最终版: 只要看见就点，消失即停)
+  // [修改] 后台常驻唤醒守护 (V14 正式版 - 精简日志 + 点击统计)
   // ===================================================================================
   async _startBackgroundWakeup() {
-    // 1. 绝对缓冲：等待 5 秒
-    await new Promise(r => setTimeout(r, 5000));
+    // 1. 初始缓冲
+    await new Promise(r => setTimeout(r, 2000));
     
-    // 安全检查
     if (!this.page || this.page.isClosed()) return;
 
-    this.logger.info('[Browser] (后台任务) 开始执行唤醒检查 (点击即消失模式)...');
+    this.logger.info('[Browser] (后台任务) 唤醒守护进程已启动 (Target: .interaction-modal p)');
 
-    try {
-        // 先尝试清理一次干扰项
+    // 2. 无限循环守护
+    while (this.page && !this.page.isClosed()) {
         try {
-            const gotIt = this.page.locator('button:has-text("Got it")').first();
-            if (await gotIt.isVisible()) await gotIt.click({ force: true });
-            
-            await this.page.evaluate(() => {
-                document.querySelectorAll('.cdk-overlay-backdrop').forEach(el => el.remove());
-            });
-        } catch (e) {}
-
-        // 锁定目标：只要包含 "Launch" 的按钮 (不管它是 Launch! 还是 Launch)
-        const launchBtn = this.page.locator('button:has-text("Launch")').first();
-        
-        // 如果起手就看不到，直接收工
-        if (!await launchBtn.isVisible({ timeout: 3000 })) {
-            this.logger.info('[Browser] (后台任务) 未检测到 Launch 按钮，APP 可能已在运行。');
-            return; 
-        }
-
-        this.logger.warn('⚠️ [Browser] (后台任务) 发现 Launch 按钮，开始点击直到它消失...');
-        
-        let attempt = 0;
-        const maxAttempts = 50; 
-
-        while (attempt < maxAttempts) {
-            if (!this.page || this.page.isClosed()) break;
-
-            // 1. 每次循环最开始：检查按钮还在不在？
-            // 如果它已经消失了，立刻庆祝并退出
-            const isStillThere = await launchBtn.isVisible({ timeout: 200 });
-            if (!isStillThere) {
-                this.logger.info(`[Browser] ✅ 唤醒成功！按钮已消失 (共点击 ${attempt} 次)。`);
-                break;
-            }
-
-            // 2. 如果还在，就点它
-            attempt++;
+            // --- A. 顺手清理干扰 (Got it) ---
             try {
-                // 双重保险：每次点击前都顺手清理一下可能挡路的 "Got it"
-                const annoyingPopup = this.page.locator('button:has-text("Got it")').first();
-                if (await annoyingPopup.isVisible({ timeout: 50 })) {
-                    await annoyingPopup.click({ force: true });
-                }
+                const gotIt = this.page.locator('button:has-text("Got it")').first();
+                if (await gotIt.isVisible({ timeout: 50 })) await gotIt.click({ force: true });
+                await this.page.evaluate(() => document.querySelectorAll('.cdk-overlay-backdrop').forEach(el => el.remove()));
+            } catch (e) {}
 
-                // 正式点击
-                await launchBtn.click({ force: true, timeout: 500 });
+            // --- B. 核心查找逻辑 (基于 CSS 类名和内容指纹) ---
+            // 锁定 interaction-modal 内部的段落，且必须包含 rocket_launch 图标代码和 Launch 文字
+            const targetElement = this.page.locator('.interaction-modal p')
+                .filter({ hasText: 'rocket_launch' }) 
+                .filter({ hasText: /Launch/i })       
+                .first();
+
+            // 检测是否存在且可见
+            if (await targetElement.isVisible({ timeout: 500 })) {
                 
-                // 3. 这里的等待很关键：点完要给页面一点反应时间让按钮消失
-                // [修改] 等待时间改为 1000 毫秒 (1秒)，即每隔一秒检测一次
-                await this.page.waitForTimeout(1000); 
+                // 获取弹窗文本用于记录
+                const text = (await targetElement.innerText()).replace(/\n/g, ' ').trim();
+                this.logger.warn(`[Browser] 检测到应用休眠弹窗，内容: [${text}]`);
+                this.logger.info('[Browser] 正在执行唤醒操作...');
 
-            } catch (err) {
-                // 点击报错通常意味着点的一瞬间它消失了，或者被遮挡了
-                // 不管怎样，进入下一次循环的 isVisible 检查自会分晓
+                // --- C. 连点统计逻辑 ---
+                let clickCount = 0;
+                let isDismissed = false;
+
+                for (let i = 1; i <= 30; i++) {
+                    // 1. 检查是否已消失
+                    if (!await targetElement.isVisible({ timeout: 50 })) {
+                        isDismissed = true;
+                        break;
+                    }
+
+                    try {
+                        // 2. 执行点击
+                        await targetElement.click({ force: true, noWaitAfter: true, timeout: 500 });
+                        clickCount++;
+                    } catch (err) { 
+                        // 点击报错通常意味着元素在点击瞬间消失了，视为成功
+                        isDismissed = true;
+                        break; 
+                    }
+                    
+                    // 间隔 100ms
+                    await this.page.waitForTimeout(100);
+                }
+                
+                // --- D. 输出结果 ---
+                if (isDismissed) {
+                    this.logger.info(`[Browser] ✅ 唤醒成功！弹窗已消失 (共点击 ${clickCount} 次)。`);
+                } else {
+                    this.logger.warn(`[Browser] ⚠️ 已尝试点击 ${clickCount} 次，但弹窗可能仍存在，进入冷却期。`);
+                }
+                
+                // 强制冷却 3 秒
+                await this.page.waitForTimeout(3000);
+
+            } else {
+                // 未检测到休眠，常规等待 2 秒
+                await this.page.waitForTimeout(2000);
             }
+
+        } catch (e) {
+            // 捕获页面关闭或其他意外错误
+            if (this.page && this.page.isClosed()) break;
+            await this.page.waitForTimeout(2000); 
         }
-
-        if (attempt >= maxAttempts) {
-            // 如果到了 50 次还在，那可能是真的遇到硬茬了
-            this.logger.warn(`[Browser] ℹ️ 达到点击上限 (${maxAttempts}次)，按钮可能依然顽强存在或已经消失？请自行尝试可用性。`);
-        }
-
-        // 截图留证
-        try {
-            if (this.page && !this.page.isClosed()) {
-                const shotPath = path.join(os.tmpdir(), `debug_bg_final_${Date.now()}.png`);
-                await this.page.screenshot({ path: shotPath, fullPage: true });
-                this.logger.info(`📷 [Debug] 任务结束截图: ${shotPath}`);
-            }
-        } catch (e) {}
-
-    } catch (e) {
-        this.logger.warn('[Browser] (后台任务) 异常: ' + e.message);
     }
+    
+    this.logger.info('[Browser] (后台任务) 页面已关闭，唤醒守护进程停止。');
   }
 }
 // ===================================================================================
@@ -2162,7 +2159,7 @@ class ProxyServerSystem extends EventEmitter {
     await this._startHttpServer();
     await this._startWebSocketServer();
     this.logger.info(`[System] 代理服务器系统启动完成。`);
-    // [新增] 系统完全启动后，在后台执行唤醒检测，确保 WebSocket 已就绪
+    // 系统完全启动后，在后台执行
     this.browserManager._startBackgroundWakeup();
     this.emit("started");
   }
