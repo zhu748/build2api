@@ -2590,8 +2590,8 @@ class ProxyServerSystem extends EventEmitter {
                     </div>
                     <div class="row-item">
                         <div>
-                            <div class="row-label">强制 OAI 格式推理</div>
-                            <div class="row-desc">为 OpenAI 格式请求注入 thinkingConfig</div>
+                            <div class="row-label">OAI格式思考</div>
+                            <div class="row-desc">强制开启OAI格式的思考功能</div>
                         </div>
                         <div>
                             <label class="switch">
@@ -2602,8 +2602,8 @@ class ProxyServerSystem extends EventEmitter {
                     </div>
                     <div class="row-item">
                         <div>
-                            <div class="row-label">强制原生格式推理</div>
-                            <div class="row-desc">为 Gemini 原生请求注入 thinkingConfig</div>
+                            <div class="row-label">原生格式思考</div>
+                            <div class="row-desc">强制开启原生格式的思考功能</div>
                         </div>
                         <div>
                             <label class="switch">
@@ -2627,7 +2627,7 @@ class ProxyServerSystem extends EventEmitter {
                     <div class="row-item">
                         <div>
                             <div class="row-label">截断自动续写</div>
-                            <div class="row-desc">内容被截断时自动尝试继续生成</div>
+                            <div class="row-desc">内容被截断时自动尝试继续生成(⚠️该功能仅在Real模式下开启流式传输时生效)</div>
                         </div>
                         <div style="display: flex; align-items: center;">
                             <input type="number" class="num-input" id="resumeLimitInput" value="3" min="1" max="10" placeholder="次">
@@ -2902,8 +2902,8 @@ class ProxyServerSystem extends EventEmitter {
     app.post("/api/toggle-reasoning", isAuthenticated, (req, res) => {
       this.enableReasoning = !this.enableReasoning;
       const statusText = this.enableReasoning ? "已启用" : "已禁用";
-      this.logger.info(`[WebUI] 强制OAI格式推理 (Thinking) 状态已切换为: ${statusText}`);
-      res.status(200).send(`强制OAI格式推理(Thinking)${statusText}。所有新的 OpenAI 格式请求都将受此影响。`);
+      this.logger.info(`[WebUI] 强制OAI格式思考 (Thinking) 状态已切换为: ${statusText}`);
+      res.status(200).send(`强制OAI格式思考(Thinking)${statusText}。所有新的 OpenAI 格式请求都将受此影响。`);
     });
 
     // ==========================================================
@@ -2912,8 +2912,8 @@ class ProxyServerSystem extends EventEmitter {
     app.post("/api/toggle-native-reasoning", isAuthenticated, (req, res) => {
       this.enableNativeReasoning = !this.enableNativeReasoning;
       const statusText = this.enableNativeReasoning ? "已启用" : "已禁用";
-      this.logger.info(`[WebUI] 强制原生格式推理 (Native Thinking) 状态已切换为: ${statusText}`);
-      res.status(200).send(`强制原生格式推理${statusText}。所有新的原生 Gemini 格式请求都将受此影响。`);
+      this.logger.info(`[WebUI] 强制原生格式思考 (Native Thinking) 状态已切换为: ${statusText}`);
+      res.status(200).send(`强制原生格式思考${statusText}。所有新的原生 Gemini 格式请求都将受此影响。`);
     });
 
     // ==========================================================
