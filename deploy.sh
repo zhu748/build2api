@@ -80,8 +80,51 @@ echo "----------------------------------------------------"
 echo ""
 
 # ==========================================
+# [检测] 认证配置检查 (文件或环境变量)
+# ==========================================
+echo "🔐 检查认证配置..."
+
+AUTH_VALID=false
+AUTH_MOUNT=false
+
+if [ -d "./auth" ]; then
+    # 检查是否存在 auth-*.json 格式的文件
+    AUTH_COUNT=$(find ./auth -maxdepth 1 -name "auth-*.json" -type f 2>/dev/null | wc -l)
+    
+    if [ "$AUTH_COUNT" -gt 0 ]; then
+        echo "✅ 检测到 $AUTH_COUNT 个认证文件 (auth-*.json)"
+        AUTH_VALID=true
+        AUTH_MOUNT=true
+    fi
+fi
+
+# 如果没有有效的认证文件，检查环境变量
+if [ "$AUTH_VALID" = false ]; then
+    # 检查 app.env 中是否配置了 AUTH_JSON_* 环境变量（有值且非空）
+    AUTH_ENV_COUNT=$(grep -E "^AUTH_JSON_[0-9]+=" "$ENV_FILE" | grep -vE "^AUTH_JSON_[0-9]+=\s*$" | wc -l)
+    
+    if [ "$AUTH_ENV_COUNT" -gt 0 ]; then
+        echo "✅ 检测到 $AUTH_ENV_COUNT 个环境变量认证配置 (AUTH_JSON_*)"
+        AUTH_VALID=true
+    fi
+fi
+
+# 双重检测都失败，中断部署
+if [ "$AUTH_VALID" = false ]; then
+    echo ""
+    echo "❌ 错误: 未检测到有效的认证配置！"
+    echo ""
+    echo "   请通过以下任一方式配置认证信息："
+    echo "   方式1: 在 ./auth 目录下放置 auth-1.json, auth-2.json 等文件"
+    echo "   方式2: 在 $ENV_FILE 中设置 AUTH_JSON_1, AUTH_JSON_2 等环境变量"
+    echo ""
+    exit 1
+fi
+
+# ==========================================
 # 开始部署逻辑
 # ==========================================
+echo ""
 echo "🚀 开始部署容器: $CONTAINER_NAME"
 
 # --- 更新镜像与清理旧容器 ---
@@ -100,8 +143,8 @@ DOCKER_OPTS=(
     --restart unless-stopped
 )
 
-# 挂载 auth 目录（如果存在）
-if [ -d "./auth" ]; then
+# 挂载 auth 目录（如果前面检测到有效文件）
+if [ "$AUTH_MOUNT" = true ]; then
     echo "--> 挂载 ./auth 目录 (并修正权限 1000:1000)"
     sudo chown -R 1000:1000 ./auth
     DOCKER_OPTS+=(-v "$(pwd)/auth:/app/auth")

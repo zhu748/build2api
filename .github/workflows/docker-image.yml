@@ -2,8 +2,8 @@ name: GHCR
 
 on:
   workflow_dispatch:
-  push:
-    branch: ["main"]
+#  push:
+#    branch: ["main"]
 
 env:
   REGISTRY: ghcr.io
